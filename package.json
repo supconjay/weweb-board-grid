@@ -1,0 +1,11 @@
+{
+  "name": "pp-board-grid",
+  "version": "0.0.1",
+  "scripts": {
+    "build": "weweb build --name=pp-board-grid --type=wwobject",
+    "serve": "weweb serve --type=wwobject"
+  },
+  "devDependencies": {
+    "@weweb/cli": "latest"
+  }
+}
