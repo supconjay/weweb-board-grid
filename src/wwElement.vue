@@ -16,7 +16,16 @@
         <table class="pp-grid">
           <thead>
             <tr>
-              <th v-for="col in columns" :key="col.key" :class="alignClass(col)">{{ col.label }}</th>
+              <th
+                v-for="col in columns" :key="col.key"
+                :class="[alignClass(col), { 'pp-th--sortable': isSortable(col), 'pp-th--active': sortKey === col.key }]"
+                @click="isSortable(col) && toggleSort(col)"
+              >
+                <span class="pp-th__inner">
+                  <span>{{ col.label }}</span>
+                  <svg v-if="isSortable(col)" class="pp-svg pp-th__sort" v-bind="svgAttrs"><path :d="ic(sortKey === col.key ? (sortDir === 'asc' ? 'arrow-up' : 'arrow-down') : 'sort')"></path></svg>
+                </span>
+              </th>
               <th v-if="actions.length" class="pp-grid__actionhead pp-al-right">{{ content.actionHeader || '' }}</th>
             </tr>
           </thead>
@@ -75,12 +84,21 @@ const ICONS = {
   "chevron-right": "M9 18l6-6-6-6",
   "chevrons-left": "M11 17l-5-5 5-5M18 17l-5-5 5-5",
   "chevrons-right": "M13 17l5-5-5-5M6 17l5-5-5-5",
+  sort: "M8 9l4-4 4 4M16 15l-4 4-4-4",
+  "arrow-up": "M12 19V5M5 12l7-7 7 7",
+  "arrow-down": "M12 5v14M19 12l-7 7-7-7",
 };
 
 export default {
   props: { content: { type: Object, required: true }, uid: { type: String, required: false } },
   emits: ["trigger-event"],
-  data() { return { page: 1 }; },
+  data() {
+    return {
+      page: 1,
+      sortKey: (this.content && this.content.defaultSortKey) || "",
+      sortDir: (this.content && this.content.defaultSortDir) === "desc" ? "desc" : "asc",
+    };
+  },
   watch: {
     rowsLength(n) { const pc = Math.max(1, Math.ceil(n / this.pageSizeN)); if (this.page > pc) this.page = pc; },
     filterSig() { this.page = 1; },
@@ -118,6 +136,22 @@ export default {
     },
     filterSig() { return [this.content.filterStatus, this.content.filterManager, this.content.search].join("|"); },
     rowsLength() { return this.filteredRows.length; },
+    // Client-side sort on top of the filtered rows. No sortKey = natural order.
+    sortedRows() {
+      if (!this.sortKey) return this.filteredRows;
+      const col = this.columns.find((c) => c.key === this.sortKey);
+      if (!col) return this.filteredRows;
+      const dir = this.sortDir === "desc" ? -1 : 1;
+      return this.filteredRows.slice().sort((a, b) => {
+        const va = this.sortVal(col, a.data), vb = this.sortVal(col, b.data);
+        const ea = va === null, eb = vb === null;
+        if (ea && eb) return 0;
+        if (ea) return 1;            // empties always sort last
+        if (eb) return -1;
+        if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
+        return String(va).localeCompare(String(vb), undefined, { numeric: true }) * dir;
+      });
+    },
     columns() {
       const c = Array.isArray(this.content.columns) ? this.content.columns : [];
       return c.filter((x) => x && (x.key || x.label));
@@ -132,9 +166,9 @@ export default {
     paginationActive() { return this.content.paginate !== false && this.pageCount > 1; },
     pageClamped() { return Math.min(Math.max(1, this.page), this.pageCount); },
     pagedRows() {
-      if (this.content.paginate === false) return this.filteredRows;
+      if (this.content.paginate === false) return this.sortedRows;
       const start = (this.pageClamped - 1) * this.pageSizeN;
-      return this.filteredRows.slice(start, start + this.pageSizeN);
+      return this.sortedRows.slice(start, start + this.pageSizeN);
     },
     rangeStart() { return this.filteredRows.length ? (this.pageClamped - 1) * this.pageSizeN + 1 : 0; },
     rangeEnd() { return Math.min(this.pageClamped * this.pageSizeN, this.filteredRows.length); },
@@ -218,6 +252,31 @@ export default {
       return "slate";
     },
     rowId(r) { const k = this.content.idKey || "id"; const v = r.data[k]; return v != null ? v : ""; },
+    // ---- sorting ----
+    isSortable(col) { return this.content.sortable !== false && !!col && col.sortable !== false && !!col.key; },
+    toggleSort(col) {
+      if (this.sortKey === col.key) {
+        // active column cycles asc -> desc -> off (restore natural order)
+        if (this.sortDir === "asc") this.sortDir = "desc";
+        else { this.sortKey = ""; this.sortDir = "asc"; }
+      } else {
+        this.sortKey = col.key; this.sortDir = "asc";
+      }
+      this.$emit("trigger-event", { name: "sortChange", event: { key: this.sortKey, dir: this.sortKey ? this.sortDir : "" } });
+    },
+    // Returns a comparable value: number for numeric/date columns, lowercased
+    // string otherwise, or null for empty (so blanks sort last).
+    sortVal(col, data) {
+      const v = this.rawVal(col, data);
+      if (this.isEmpty(v)) return null;
+      const t = col.sortType || col.type;
+      if (t === "currency" || t === "number" || t === "percent") {
+        const n = Number(String(v).replace(/[^0-9.\-]/g, ""));
+        return isFinite(n) ? n : null;
+      }
+      if (t === "date" || t === "datetime") { const d = new Date(v).getTime(); return isNaN(d) ? null : d; }
+      return String(v).toLowerCase();
+    },
     goPage(p) {
       const next = Math.max(1, Math.min(this.pageCount, p));
       if (next === this.page) return;
@@ -272,6 +331,15 @@ export default {
 .pp-grid__wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
 .pp-grid { width: 100%; border-collapse: collapse; font-size: 13px; }
 .pp-grid thead th { position: sticky; top: 0; z-index: 1; padding: 11px 14px; font-size: 11.5px; font-weight: 700; color: var(--text-muted); background: var(--surface-2); border-bottom: 1px solid var(--border); white-space: nowrap; text-align: left; }
+.pp-th__inner { display: inline-flex; align-items: center; gap: 5px; }
+.pp-al-right .pp-th__inner { flex-direction: row-reverse; }
+.pp-al-center .pp-th__inner { justify-content: center; }
+.pp-th--sortable { cursor: pointer; user-select: none; transition: color .15s; }
+.pp-th--sortable:hover { color: var(--text); }
+.pp-th__sort { width: 13px; height: 13px; flex: none; opacity: .35; transition: opacity .15s, color .15s; }
+.pp-th--sortable:hover .pp-th__sort { opacity: .7; }
+.pp-th--active { color: var(--text); }
+.pp-th--active .pp-th__sort { opacity: 1; color: var(--primary); }
 .pp-grid tbody td { padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
 .pp-grid tbody tr:last-child td { border-bottom: none; }
 .pp-grid tbody tr { cursor: default; transition: background .12s; }

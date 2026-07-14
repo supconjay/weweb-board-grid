@@ -7,6 +7,7 @@ export default {
     { name: "action3", label: { en: "On action #3 click" }, event: { index: 0, id: "", row: {} } },
     { name: "linkClick", label: { en: "On link / pill cell click" }, event: { index: 0, id: "", key: "", value: "", row: {} } },
     { name: "rowClick", label: { en: "On row click" }, event: { index: 0, id: "", row: {} } },
+    { name: "sortChange", label: { en: "On sort change" }, event: { key: "", dir: "" } },
     { name: "pageChange", label: { en: "On page change" }, event: { page: 1 } },
   ],
   properties: {
@@ -69,6 +70,21 @@ export default {
       ],
     },
     currency: { label: { en: "Currency" }, type: "Text", defaultValue: "USD", bindable: true, section: "settings" },
+
+    // ---- sorting ----
+    // Click a header to sort (asc -> desc -> off). Numeric/currency/percent and
+    // date columns sort by value; others alphabetically. Empty cells sort last.
+    // Per column you can add `sortable: false` to lock one, or `sortType`
+    // ("text" | "number" | "date") to override the auto-detected sort.
+    sortable: { label: { en: "Enable column sorting" }, type: "OnOff", defaultValue: true, bindable: true },
+    defaultSortKey: { label: { en: "Default sort column (field key)" }, type: "Text", defaultValue: "", bindable: true, section: "settings" },
+    defaultSortDir: {
+      label: { en: "Default sort direction" }, type: "TextSelect",
+      options: { options: [
+        { value: "asc", label: { en: "Ascending" } },
+        { value: "desc", label: { en: "Descending" } },
+      ] }, defaultValue: "asc", bindable: true, section: "settings",
+    },
 
     // ---- row action buttons (0-3) ----
     // Each: { label, event, tone }
