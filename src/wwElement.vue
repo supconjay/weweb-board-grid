@@ -214,7 +214,10 @@ export default {
       const t = col.type;
       if (this.isEmpty(v)) return "";
       if (t === "currency") return this.money(v);
-      if (t === "percent") { const s = col.scale != null ? Number(col.scale) : 1; const n = Number(v) * s; return isFinite(n) ? `${this.trimNum(n)}%` : String(v); }
+      // Percent: Airtable stores fractions (0.3 == 30%), so default scale is 100
+      // and the result is rounded to the nearest whole number. Set scale:1 on the
+      // column if your field already holds whole percents (e.g. 30).
+      if (t === "percent") { const s = col.scale != null ? Number(col.scale) : 100; const n = Number(v) * s; return isFinite(n) ? `${Math.round(n)}%` : String(v); }
       if (t === "number") { const s = col.scale != null ? Number(col.scale) : 1; const n = Number(v) * s; return isFinite(n) ? this.trimNum(n) : String(v); }
       if (t === "date") return this.formatDate(v);
       return String(v);

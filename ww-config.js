@@ -56,7 +56,9 @@ export default {
     //     link      -> plain underlined text button (emits linkClick)
     //     linkpill  -> filled blue chip button (emits linkClick) — e.g. "Created from"
     //     status/tag-> auto-colored pill
-    //     percent   -> Airtable fractions are 0.51; set scale 100 -> "51%"
+    //     percent   -> Airtable fractions (0.51) render as "51%" (scale defaults
+    //                  to 100, rounded to a whole number). Set scale:1 if your
+    //                  field already holds whole percents (e.g. 51).
     //   tagColors: { "value": "success|warning|danger|info|slate" } for status/tag
     columns: {
       label: { en: "Columns" }, type: "Array", bindable: true, section: "settings",
